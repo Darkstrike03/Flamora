@@ -32,6 +32,14 @@ set(CMAKE_CXX_FLAGS_PROFILE "${CMAKE_CXX_FLAGS_RELEASE}")
 # Use Unicode for all projects.
 add_definitions(-DUNICODE -D_UNICODE)
 
+# MSVC 14.51 (VS 18) removed <experimental/coroutine>, which
+# flutter_media_session and permission_handler_windows still include.
+# The diagnostic itself blesses this suppression until they migrate to
+# C++20 <coroutine>. Scoped to MSVC so other toolchains are unaffected.
+if(MSVC)
+  add_definitions(-D_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)
+endif()
+
 # Compilation settings that should be applied to most targets.
 #
 # Be cautious about adding new options here, as plugins use this function by
