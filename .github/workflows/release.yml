@@ -61,7 +61,6 @@ jobs:
           }
       - run: flutter build windows --release
       - name: Read version from pubspec
-      - name: Read version from pubspec
         id: version
         shell: pwsh
         run: |
