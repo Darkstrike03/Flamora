@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.38.6"
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze --no-fatal-infos
+
+  android:
+    needs: analyze
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.38.6"
+          cache: true
+      - name: Ensure Android SDK packages
+        run: |
+          yes | sdkmanager "platforms;android-35" "platforms;android-36" "build-tools;36.0.0" || true
+      - run: flutter pub get
+      - run: flutter build apk --debug --split-per-abi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk-debug
+          path: build/app/outputs/flutter-apk/*-debug.apk
+          retention-days: 5
+
+  windows:
+    needs: analyze
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.38.6"
+          cache: true
+      - run: flutter pub get
+      # Validation build only (release artifacts ship from release.yml).
+      - run: flutter build windows --release

@@ -1,0 +1,77 @@
+name: Release
+
+# Tag a version to ship: bump `version:` in pubspec.yaml, commit, then
+#   git tag v1.0.0
+#   git push origin v1.0.0
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.38.6"
+          cache: true
+      - name: Ensure Android SDK packages
+        run: |
+          yes | sdkmanager "platforms;android-35" "platforms;android-36" "build-tools;36.0.0" || true
+      - run: flutter pub get
+      - run: flutter build apk --release --split-per-abi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk-release
+          path: build/app/outputs/flutter-apk/*-release.apk
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.38.6"
+          cache: true
+      - run: flutter pub get
+      - run: flutter build windows --release
+      - name: Read version from pubspec
+        id: version
+        shell: pwsh
+        run: |
+          $v = (Select-String -Path pubspec.yaml -Pattern '^version:\s*(\S+)\s*$').Matches.Groups[1].Value -replace '\+.*',''
+          "number=$v" >> $env:GITHUB_OUTPUT
+      - name: Install Inno Setup
+        run: choco install innosetup -y
+      - name: Build installer
+        run: iscc /DAppVersion="${{ steps.version.outputs.number }}" windows/installer/flamora.iss
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: windows/installer/output/*.exe
+
+  publish:
+    needs: [android, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/**/*
+          generate_release_notes: true
+          body: |
+            > Testing-grade builds: release APKs are signed with debug keys
+            > (see the signing TODO in `android/app/build.gradle.kts`).
+            > Not for store distribution.
